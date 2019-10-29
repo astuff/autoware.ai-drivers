@@ -10,7 +10,6 @@ find_package(
   geometry_msgs
   automotive_platform_msgs
   automotive_navigation_msgs
-  pacmod_msgs
   autoware_msgs
 )
 
@@ -22,7 +21,6 @@ catkin_package(
   geometry_msgs
   automotive_platform_msgs
   automotive_navigation_msgs
-  pacmod_msgs
   autoware_msgs
 )
 
