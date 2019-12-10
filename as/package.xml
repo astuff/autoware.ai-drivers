@@ -18,4 +18,5 @@
   <depend>message_filters</depend>
   <depend>roscpp</depend>
   <depend>std_msgs</depend>
+  <depend>ros_observer</depend>  
 </package>
