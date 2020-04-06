@@ -38,7 +38,6 @@
 #include <automotive_navigation_msgs/ModuleState.h>
 #include <automotive_platform_msgs/SteeringFeedback.h>
 
-
 #include <autoware_msgs/VehicleCmd.h>
 #include <autoware_msgs/VehicleStatus.h>
 
@@ -49,14 +48,29 @@ class SSCInterface
 public:
   SSCInterface();
 
-  void run();
-
 private:
+  void init();
+
+  // Subscriber callbacks
+  void callbackFromVehicleCmd(const autoware_msgs::VehicleCmdConstPtr& msg);
+  void callbackFromEngage(const std_msgs::BoolConstPtr& msg);
+  void callbackFromSSCModuleStates(const automotive_navigation_msgs::ModuleStateConstPtr& msg);
+  void callbackFromSSCFeedbacks(
+    const automotive_platform_msgs::VelocityAccelCovConstPtr& msg_velocity,
+    const automotive_platform_msgs::CurvatureFeedbackConstPtr& msg_curvature,
+    const automotive_platform_msgs::ThrottleFeedbackConstPtr& msg_throttle,
+    const automotive_platform_msgs::BrakeFeedbackConstPtr& msg_brake,
+    const automotive_platform_msgs::GearFeedbackConstPtr& msg_gear,
+    const automotive_platform_msgs::SteeringFeedbackConstPtr& msg_steering_wheel);
+
+  // Functions
+  void publishCommand();
+
   typedef message_filters::sync_policies::ApproximateTime<
-      automotive_platform_msgs::VelocityAccelCov, automotive_platform_msgs::CurvatureFeedback,
-      automotive_platform_msgs::ThrottleFeedback, automotive_platform_msgs::BrakeFeedback,
-      automotive_platform_msgs::GearFeedback, automotive_platform_msgs::SteeringFeedback>
-      SSCFeedbacksSyncPolicy;
+    automotive_platform_msgs::VelocityAccelCov, automotive_platform_msgs::CurvatureFeedback,
+    automotive_platform_msgs::ThrottleFeedback, automotive_platform_msgs::BrakeFeedback,
+    automotive_platform_msgs::GearFeedback, automotive_platform_msgs::SteeringFeedback>
+    SSCFeedbacksSyncPolicy;
 
   // handle
   ros::NodeHandle nh_;
@@ -103,25 +117,12 @@ private:
   // max steering wheel rotation rate = 6.28 [rad/s]
 
   // variables
-  bool engage_;
-  bool command_initialized_;
+  bool engage_ = false;
+  bool command_initialized_ = false;
+  bool dbw_enabled_ = false;
   double adaptive_gear_ratio_;
   ros::Time command_time_;
   autoware_msgs::VehicleCmd vehicle_cmd_;
-  automotive_navigation_msgs::ModuleState module_states_;
-
-  // callbacks
-  void callbackFromVehicleCmd(const autoware_msgs::VehicleCmdConstPtr& msg);
-  void callbackFromEngage(const std_msgs::BoolConstPtr& msg);
-  void callbackFromSSCModuleStates(const automotive_navigation_msgs::ModuleStateConstPtr& msg);
-  void callbackFromSSCFeedbacks(const automotive_platform_msgs::VelocityAccelCovConstPtr& msg_velocity,
-                                const automotive_platform_msgs::CurvatureFeedbackConstPtr& msg_curvature,
-                                const automotive_platform_msgs::ThrottleFeedbackConstPtr& msg_throttle,
-                                const automotive_platform_msgs::BrakeFeedbackConstPtr& msg_brake,
-                                const automotive_platform_msgs::GearFeedbackConstPtr& msg_gear,
-                                const automotive_platform_msgs::SteeringFeedbackConstPtr& msg_steering_wheel);
-  // functions
-  void publishCommand();
 };
 
 #endif  // SSC_INTERFACE_H
