@@ -27,11 +27,12 @@ catkin_package(
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  include
 )
 
 add_executable(ssc_interface
-  nodes/ssc_interface/ssc_interface_node.cpp
-  nodes/ssc_interface/ssc_interface.cpp
+  src/ssc_interface_node.cpp
+  src/ssc_interface.cpp
 )
 
 target_link_libraries(ssc_interface ${catkin_LIBRARIES})
