@@ -26,7 +26,7 @@ void SSCInterface::init()
 {
   // Parameters
   private_nh_.param<bool>("use_adaptive_gear_ratio", use_adaptive_gear_ratio_, true);
-  private_nh_.param<int>("command_timeout", command_timeout_, 1000);
+  private_nh_.param<int>("command_timeout", command_timeout_, 200);
   private_nh_.param<double>("wheel_base", wheel_base_, 2.79);
   private_nh_.param<double>("tire_radius", tire_radius_, 0.39);
   private_nh_.param<double>("ssc_gear_ratio", ssc_gear_ratio_, 16.135);
@@ -65,14 +65,19 @@ void SSCInterface::init()
   turn_signal_pub_ = nh_.advertise<automotive_platform_msgs::TurnSignalCommand>("ssc/turn_signal_command", 10);
   gear_pub_ = nh_.advertise<automotive_platform_msgs::GearCommand>("ssc/gear_select", 1, true);
 
+  // Command timeout timer, starts automatically
+  timeout_timer_ = nh_.createTimer(ros::Duration(command_timeout_/1000.0), &SSCInterface::timeout, this);
+
   ROS_INFO("ssc_interface initialized");
 }
 
 void SSCInterface::callbackFromVehicleCmd(const autoware_msgs::VehicleCmdConstPtr& msg)
 {
-  command_time_ = ros::Time::now();
   vehicle_cmd_ = *msg;
   command_initialized_ = true;
+
+  // Reset timeout
+  timeout_timer_.setPeriod(ros::Duration(command_timeout_/1000.0), true);
 
   publishCommand();
 }
@@ -231,13 +236,10 @@ void SSCInterface::publishCommand()
     // NOTE: HAZARD signal cannot be used in automotive_platform_msgs::TurnSignalCommand
   }
 
-  // Override desired speed to ZERO by emergency/timeout
-  bool emergency = (vehicle_cmd_.emergency == 1);
-  bool timeouted = (((ros::Time::now() - command_time_).toSec() * 1000) > command_timeout_);
-
-  if (emergency || timeouted)
+  // Override desired speed to ZERO for emergency stops
+  if (vehicle_cmd_.emergency == 1)
   {
-    ROS_ERROR("Emergency Stopping, emergency = %d, timeouted = %d", emergency, timeouted);
+    ROS_ERROR("Emergency Stopping, speed overridden to 0");
     desired_speed = 0.0;
   }
 
@@ -282,4 +284,16 @@ void SSCInterface::publishCommand()
                            << "Curvature: " << steer_mode.curvature << ", "
                            << "Gear: " << (int)gear_cmd.command.gear << ", "
                            << "TurnSignal: " << (int)turn_signal.turn_signal);
+}
+
+void SSCInterface::timeout(const ros::TimerEvent& event)
+{
+  if (engage_) {
+    ROS_ERROR("Did not receive any commands for %d ms", command_timeout_);
+    ROS_ERROR("SSC will be disabled until re-enabled");
+  }
+
+  // Disable and publish keepalive commands to prevent SSC from going into fatal
+  engage_ = false;
+  publishCommand();
 }

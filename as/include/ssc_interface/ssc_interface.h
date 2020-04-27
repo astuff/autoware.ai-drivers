@@ -63,6 +63,9 @@ private:
     const automotive_platform_msgs::GearFeedbackConstPtr& msg_gear,
     const automotive_platform_msgs::SteeringFeedbackConstPtr& msg_steering_wheel);
 
+  // Timer callback
+  void timeout(const ros::TimerEvent& event);
+
   // Functions
   void publishCommand();
 
@@ -96,6 +99,9 @@ private:
   ros::Publisher vehicle_status_pub_;
   ros::Publisher current_twist_pub_;
 
+  // Timers
+  ros::Timer timeout_timer_;
+
   // ros param
   int command_timeout_;        // vehicle_cmd timeout [ms]
   double loop_rate_;           // [Hz]
@@ -121,7 +127,6 @@ private:
   bool command_initialized_ = false;
   bool dbw_enabled_ = false;
   double adaptive_gear_ratio_;
-  ros::Time command_time_;
   autoware_msgs::VehicleCmd vehicle_cmd_;
 };
 

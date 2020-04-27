@@ -1,7 +1,7 @@
 <!-- -->
 <launch>
 	<arg name="use_adaptive_gear_ratio" default="true"/>
-	<arg name="command_timeout" default="1000"/>
+	<arg name="command_timeout" default="200"/>
 	<arg name="wheel_base" default="2.79"/>
 	<arg name="tire_radius" default="0.39"/>
 	<arg name="acceleration_limit" default="3.0"/>
