@@ -2,11 +2,11 @@ repositories:
   depends/autoware/common:
     type: git
     url: https://gitlab.com/astuff/autoware.ai/common.git
-    version: oap5
+    version: as/master
   depends/autoware/messages:
     type: git
     url: https://gitlab.com/astuff/autoware.ai/messages.git
-    version: oap5
+    version: as/master
   depends/drivers/ds4:
     type: git
     url: https://github.com/tier4/ds4.git
