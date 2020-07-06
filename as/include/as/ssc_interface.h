@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef SSC_INTERFACE_H
-#define SSC_INTERFACE_H
+#ifndef AS_SSC_INTERFACE_H
+#define AS_SSC_INTERFACE_H
+
+#include <string>
 
 #include <ros/ros.h>
 #include <std_msgs/Bool.h>
@@ -38,7 +40,6 @@
 #include <automotive_navigation_msgs/ModuleState.h>
 #include <automotive_platform_msgs/SteeringFeedback.h>
 
-
 #include <autoware_msgs/VehicleCmd.h>
 #include <autoware_msgs/VehicleStatus.h>
 
@@ -48,7 +49,6 @@ class SSCInterface
 {
 public:
   SSCInterface();
-  ~SSCInterface();
 
   void run();
 
@@ -92,6 +92,7 @@ private:
   double max_curvature_rate_;  // [rad/m/s]
 
   bool use_adaptive_gear_ratio_;  // for more accurate steering angle (gr = theta_sw / theta_s)
+  bool enable_reverse_motion_;    // flag to change gear for backward driving
   double tire_radius_;            // [m] (NOTE: used by 'use_rear_wheel_speed' mode)
   double ssc_gear_ratio_;         // gr = const (NOTE: used by 'use_adaptive_gear_ratio' mode)
   double agr_coef_a_, agr_coef_b_, agr_coef_c_;  // gr = a + b * speed^2 + c * theta_sw
@@ -126,4 +127,4 @@ private:
   void publishCommand();
 };
 
-#endif  // SSC_INTERFACE_H
+#endif  // AS_SSC_INTERFACE_H
