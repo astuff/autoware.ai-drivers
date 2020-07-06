@@ -16,13 +16,14 @@
 
 #include <ros/ros.h>
 
-#include "as/ssc_interface.h"
+#include "ssc_interface/ssc_interface.h"
 
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "ssc_interface");
   SSCInterface node;
-  node.run();
+
+  ros::spin();
 
   return 0;
 }
