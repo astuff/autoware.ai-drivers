@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+#include <string>
+
 #include "ssc_interface/ssc_interface.h"
 #include <ros_observer/lib_ros_observer.h>
 
@@ -121,8 +124,9 @@ void SSCInterface::callbackFromSSCFeedbacks(
   ros::Time stamp = msg_velocity->header.stamp;
 
   // update adaptive gear ratio (avoiding zero divizion)
-  adaptive_gear_ratio_ =
-    std::max(1e-5, agr_coef_a_ + agr_coef_b_ * msg_velocity->velocity * msg_velocity->velocity - agr_coef_c_ * msg_steering_wheel->steering_wheel_angle);
+  adaptive_gear_ratio_ = std::max(1e-5,
+    agr_coef_a_ + agr_coef_b_ * msg_velocity->velocity * msg_velocity->velocity
+    - agr_coef_c_ * msg_steering_wheel->steering_wheel_angle);
 
   // current steering curvature
   double curvature;
@@ -339,7 +343,8 @@ void SSCInterface::publishCommand()
 
 void SSCInterface::timeout(const ros::TimerEvent& event)
 {
-  if (engage_) {
+  if (engage_)
+  {
     ROS_ERROR("Did not receive any commands for %d ms", command_timeout_);
     ROS_ERROR("SSC will be disabled until re-enabled");
   }

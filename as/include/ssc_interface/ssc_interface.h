@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef SSC_INTERFACE_H
-#define SSC_INTERFACE_H
+#ifndef SSC_INTERFACE_SSC_INTERFACE_H
+#define SSC_INTERFACE_SSC_INTERFACE_H
 
+#include <string>
 #include <ros/ros.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Time.h>
@@ -130,4 +131,4 @@ private:
   autoware_msgs::VehicleCmd vehicle_cmd_;
 };
 
-#endif  // SSC_INTERFACE_H
+#endif  // SSC_INTERFACE_SSC_INTERFACE_H
