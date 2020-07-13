@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef SSC_INTERFACE_SSC_INTERFACE_H
-#define SSC_INTERFACE_SSC_INTERFACE_H
+#ifndef AS_SSC_INTERFACE_H
+#define AS_SSC_INTERFACE_H
 
 #include <string>
+
 #include <ros/ros.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Time.h>
@@ -49,32 +50,14 @@ class SSCInterface
 public:
   SSCInterface();
 
+  void run();
+
 private:
-  void init();
-
-  // Subscriber callbacks
-  void callbackFromVehicleCmd(const autoware_msgs::VehicleCmdConstPtr& msg);
-  void callbackFromEngage(const std_msgs::BoolConstPtr& msg);
-  void callbackFromSSCModuleStates(const automotive_navigation_msgs::ModuleStateConstPtr& msg);
-  void callbackFromSSCFeedbacks(
-    const automotive_platform_msgs::VelocityAccelCovConstPtr& msg_velocity,
-    const automotive_platform_msgs::CurvatureFeedbackConstPtr& msg_curvature,
-    const automotive_platform_msgs::ThrottleFeedbackConstPtr& msg_throttle,
-    const automotive_platform_msgs::BrakeFeedbackConstPtr& msg_brake,
-    const automotive_platform_msgs::GearFeedbackConstPtr& msg_gear,
-    const automotive_platform_msgs::SteeringFeedbackConstPtr& msg_steering_wheel);
-
-  // Timer callback
-  void timeout(const ros::TimerEvent& event);
-
-  // Functions
-  void publishCommand();
-
   typedef message_filters::sync_policies::ApproximateTime<
-    automotive_platform_msgs::VelocityAccelCov, automotive_platform_msgs::CurvatureFeedback,
-    automotive_platform_msgs::ThrottleFeedback, automotive_platform_msgs::BrakeFeedback,
-    automotive_platform_msgs::GearFeedback, automotive_platform_msgs::SteeringFeedback>
-    SSCFeedbacksSyncPolicy;
+      automotive_platform_msgs::VelocityAccelCov, automotive_platform_msgs::CurvatureFeedback,
+      automotive_platform_msgs::ThrottleFeedback, automotive_platform_msgs::BrakeFeedback,
+      automotive_platform_msgs::GearFeedback, automotive_platform_msgs::SteeringFeedback>
+      SSCFeedbacksSyncPolicy;
 
   // handle
   ros::NodeHandle nh_;
@@ -84,13 +67,13 @@ private:
   ros::Subscriber vehicle_cmd_sub_;
   ros::Subscriber engage_sub_;
   ros::Subscriber module_states_sub_;
-  message_filters::Subscriber<automotive_platform_msgs::VelocityAccelCov> velocity_accel_sub_;
-  message_filters::Subscriber<automotive_platform_msgs::CurvatureFeedback> curvature_feedback_sub_;
-  message_filters::Subscriber<automotive_platform_msgs::ThrottleFeedback> throttle_feedback_sub_;
-  message_filters::Subscriber<automotive_platform_msgs::BrakeFeedback> brake_feedback_sub_;
-  message_filters::Subscriber<automotive_platform_msgs::GearFeedback> gear_feedback_sub_;
-  message_filters::Subscriber<automotive_platform_msgs::SteeringFeedback> steering_wheel_sub_;
-  std::unique_ptr<message_filters::Synchronizer<SSCFeedbacksSyncPolicy>> ssc_feedbacks_sync_;
+  message_filters::Subscriber<automotive_platform_msgs::VelocityAccelCov>* velocity_accel_sub_;
+  message_filters::Subscriber<automotive_platform_msgs::CurvatureFeedback>* curvature_feedback_sub_;
+  message_filters::Subscriber<automotive_platform_msgs::ThrottleFeedback>* throttle_feedback_sub_;
+  message_filters::Subscriber<automotive_platform_msgs::BrakeFeedback>* brake_feedback_sub_;
+  message_filters::Subscriber<automotive_platform_msgs::GearFeedback>* gear_feedback_sub_;
+  message_filters::Subscriber<automotive_platform_msgs::SteeringFeedback>* steering_wheel_sub_;
+  message_filters::Synchronizer<SSCFeedbacksSyncPolicy>* ssc_feedbacks_sync_;
 
   // publishers
   ros::Publisher steer_mode_pub_;
@@ -100,18 +83,16 @@ private:
   ros::Publisher vehicle_status_pub_;
   ros::Publisher current_twist_pub_;
 
-  // Timers
-  ros::Timer timeout_timer_;
-
   // ros param
   int command_timeout_;        // vehicle_cmd timeout [ms]
+  double loop_rate_;           // [Hz]
   double wheel_base_;          // [m]
   double acceleration_limit_;  // [m/s^2]
   double deceleration_limit_;  // [m/s^2]
   double max_curvature_rate_;  // [rad/m/s]
 
-  bool enable_reverse_motion_;    // flag to change gear for backward driving
   bool use_adaptive_gear_ratio_;  // for more accurate steering angle (gr = theta_sw / theta_s)
+  bool enable_reverse_motion_;    // flag to change gear for backward driving
   double tire_radius_;            // [m] (NOTE: used by 'use_rear_wheel_speed' mode)
   double ssc_gear_ratio_;         // gr = const (NOTE: used by 'use_adaptive_gear_ratio' mode)
   double agr_coef_a_, agr_coef_b_, agr_coef_c_;  // gr = a + b * speed^2 + c * theta_sw
@@ -124,11 +105,26 @@ private:
   // max steering wheel rotation rate = 6.28 [rad/s]
 
   // variables
-  bool engage_ = false;
-  bool command_initialized_ = false;
-  bool dbw_enabled_ = false;
+  bool engage_;
+  bool command_initialized_;
   double adaptive_gear_ratio_;
+  ros::Time command_time_;
   autoware_msgs::VehicleCmd vehicle_cmd_;
+  automotive_navigation_msgs::ModuleState module_states_;
+  ros::Rate* rate_;
+
+  // callbacks
+  void callbackFromVehicleCmd(const autoware_msgs::VehicleCmdConstPtr& msg);
+  void callbackFromEngage(const std_msgs::BoolConstPtr& msg);
+  void callbackFromSSCModuleStates(const automotive_navigation_msgs::ModuleStateConstPtr& msg);
+  void callbackFromSSCFeedbacks(const automotive_platform_msgs::VelocityAccelCovConstPtr& msg_velocity,
+                                const automotive_platform_msgs::CurvatureFeedbackConstPtr& msg_curvature,
+                                const automotive_platform_msgs::ThrottleFeedbackConstPtr& msg_throttle,
+                                const automotive_platform_msgs::BrakeFeedbackConstPtr& msg_brake,
+                                const automotive_platform_msgs::GearFeedbackConstPtr& msg_gear,
+                                const automotive_platform_msgs::SteeringFeedbackConstPtr& msg_steering_wheel);
+  // functions
+  void publishCommand();
 };
 
-#endif  // SSC_INTERFACE_SSC_INTERFACE_H
+#endif  // AS_SSC_INTERFACE_H
