@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <string>
+#include <limits>
 
 #include "ssc_interface/ssc_interface.h"
 #include <ros_observer/lib_ros_observer.h>
@@ -31,15 +32,15 @@ void SSCInterface::init()
   private_nh_.param<bool>("use_adaptive_gear_ratio", use_adaptive_gear_ratio_, true);
   private_nh_.param<bool>("enable_reverse_motion", enable_reverse_motion_, false);
   private_nh_.param<int>("command_timeout", command_timeout_, 200);
-  private_nh_.param<double>("wheel_base", wheel_base_, 2.79);
-  private_nh_.param<double>("tire_radius", tire_radius_, 0.39);
-  private_nh_.param<double>("ssc_gear_ratio", ssc_gear_ratio_, 16.135);
-  private_nh_.param<double>("acceleration_limit", acceleration_limit_, 3.0);
-  private_nh_.param<double>("deceleration_limit", deceleration_limit_, 3.0);
-  private_nh_.param<double>("max_curvature_rate", max_curvature_rate_, 0.15);
-  private_nh_.param<double>("agr_coef_a", agr_coef_a_, 15.713);
-  private_nh_.param<double>("agr_coef_b", agr_coef_b_, 0.053);
-  private_nh_.param<double>("agr_coef_c", agr_coef_c_, 0.042);
+  private_nh_.param<float>("wheel_base", wheel_base_, 2.79);
+  private_nh_.param<float>("tire_radius", tire_radius_, 0.39);
+  private_nh_.param<float>("ssc_gear_ratio", ssc_gear_ratio_, 16.135);
+  private_nh_.param<float>("acceleration_limit", acceleration_limit_, 3.0);
+  private_nh_.param<float>("deceleration_limit", deceleration_limit_, 3.0);
+  private_nh_.param<float>("max_curvature_rate", max_curvature_rate_, 0.15);
+  private_nh_.param<float>("agr_coef_a", agr_coef_a_, 15.713);
+  private_nh_.param<float>("agr_coef_b", agr_coef_b_, 0.053);
+  private_nh_.param<float>("agr_coef_c", agr_coef_c_, 0.042);
 
   // Subscribers from autoware
   vehicle_cmd_sub_ = nh_.subscribe("vehicle_cmd", 1, &SSCInterface::callbackFromVehicleCmd, this);
@@ -124,12 +125,12 @@ void SSCInterface::callbackFromSSCFeedbacks(
   ros::Time stamp = msg_velocity->header.stamp;
 
   // update adaptive gear ratio (avoiding zero divizion)
-  adaptive_gear_ratio_ = std::max(1e-5,
+  adaptive_gear_ratio_ = std::max(std::numeric_limits<float>::min(),
     agr_coef_a_ + agr_coef_b_ * msg_velocity->velocity * msg_velocity->velocity
     - agr_coef_c_ * msg_steering_wheel->steering_wheel_angle);
 
   // current steering curvature
-  double curvature;
+  float curvature;
   if (use_adaptive_gear_ratio_)
   {
     curvature = std::tan(msg_steering_wheel->steering_wheel_angle/ adaptive_gear_ratio_) / wheel_base_;
@@ -168,26 +169,7 @@ void SSCInterface::callbackFromSSCFeedbacks(
   vehicle_status.angle = std::atan(curvature * wheel_base_);
 
   // gearshift
-  if (msg_gear->current_gear.gear == automotive_platform_msgs::Gear::NONE)
-  {
-    vehicle_status.current_gear.gear = autoware_msgs::Gear::NONE;
-  }
-  else if (msg_gear->current_gear.gear == automotive_platform_msgs::Gear::PARK)
-  {
-    vehicle_status.current_gear.gear = autoware_msgs::Gear::PARK;
-  }
-  else if (msg_gear->current_gear.gear == automotive_platform_msgs::Gear::REVERSE)
-  {
-    vehicle_status.current_gear.gear = autoware_msgs::Gear::REVERSE;
-  }
-  else if (msg_gear->current_gear.gear == automotive_platform_msgs::Gear::NEUTRAL)
-  {
-    vehicle_status.current_gear.gear = autoware_msgs::Gear::NEUTRAL;
-  }
-  else if (msg_gear->current_gear.gear == automotive_platform_msgs::Gear::DRIVE)
-  {
-    vehicle_status.current_gear.gear = autoware_msgs::Gear::DRIVE;
-  }
+  vehicle_status.current_gear.gear = convertGear(msg_gear->current_gear);
 
   // lamp/light cannot be obtain from SSC
   // vehicle_status.lamp
@@ -205,74 +187,52 @@ void SSCInterface::publishCommand()
 
   ros::Time stamp = ros::Time::now();
 
-  // Desired values
-  // Driving mode (If autonomy mode should be active, mode = 1)
-  unsigned char desired_mode = engage_ ? 1 : 0;
-
   // Check gear and velocity
   bool is_valid_cmd =
       ((vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::DRIVE ||
         vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::LOW) &&
        vehicle_cmd_.ctrl_cmd.linear_velocity >= 0.0) ||
-      (vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::REVERSE && vehicle_cmd_.ctrl_cmd.linear_velocity <= 0.0);
+      (vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::REVERSE &&
+      vehicle_cmd_.ctrl_cmd.linear_velocity <= 0.0) ||
+      (vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::PARK &&
+      vehicle_cmd_.ctrl_cmd.linear_velocity <= LOW_SPEED_THRESH &&
+      vehicle_cmd_.ctrl_cmd.linear_velocity >= -LOW_SPEED_THRESH);
   if (!is_valid_cmd)
   {
-    ROS_WARN("Invalid Vehicle Cmd, cmd gear = %d, cmd velocity = %lf", vehicle_cmd_.gear_cmd.gear,
-             vehicle_cmd_.ctrl_cmd.linear_velocity);
+    ROS_WARN("Invalid Vehicle Cmd, gear = %d, velocity = %lf",
+      vehicle_cmd_.gear_cmd.gear,
+      vehicle_cmd_.ctrl_cmd.linear_velocity);
+    ROS_WARN("Disengaging autonomy");
+    engage_ = false;
   }
+
+  // Desired values
+  // Driving mode (If autonomy mode should be active, mode = 1)
+  uint16_t desired_mode = engage_ ? 1 : 0;
+
   // Speed for SSC speed_model
-  double desired_speed = is_valid_cmd ? fabs(vehicle_cmd_.ctrl_cmd.linear_velocity) : 0.0;
+  float desired_speed = is_valid_cmd ? fabs(vehicle_cmd_.ctrl_cmd.linear_velocity) : 0.0;
 
   // Curvature for SSC steer_model
-  double desired_steering_angle = !use_adaptive_gear_ratio_ ?
+  float desired_steering_angle = !use_adaptive_gear_ratio_ ?
                                       vehicle_cmd_.ctrl_cmd.steering_angle :
                                       vehicle_cmd_.ctrl_cmd.steering_angle * ssc_gear_ratio_ / adaptive_gear_ratio_;
-  double desired_curvature = std::tan(desired_steering_angle) / wheel_base_;
+  float desired_curvature = std::tan(desired_steering_angle) / wheel_base_;
 
   // Gear
-
-  unsigned char desired_gear = automotive_platform_msgs::Gear::NONE;
-
-  if (!enable_reverse_motion_)
+  uint8_t desired_gear;
+  desired_gear = automotive_platform_msgs::Gear::NONE;
+  if (engage_ && is_valid_cmd)
   {
-    desired_gear = engage_ ? automotive_platform_msgs::Gear::DRIVE : automotive_platform_msgs::Gear::NONE;
-  }
-  else
-  {
-    if (engage_ && is_valid_cmd)
+    desired_gear = convertGear(vehicle_cmd_.gear_cmd);
+    if (desired_gear == automotive_platform_msgs::Gear::REVERSE && !enable_reverse_motion_)
     {
-      if (vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::NONE)
-      {
-        desired_gear = automotive_platform_msgs::Gear::NONE;
-      }
-      else if (vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::PARK)
-      {
-        desired_gear = automotive_platform_msgs::Gear::PARK;
-      }
-      else if (vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::REVERSE)
-      {
-        desired_gear = automotive_platform_msgs::Gear::REVERSE;
-      }
-      else if (vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::NEUTRAL)
-      {
-        desired_gear = automotive_platform_msgs::Gear::NEUTRAL;
-      }
-      else if (vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::DRIVE)
-      {
-        desired_gear = automotive_platform_msgs::Gear::DRIVE;
-      }
-      else if (vehicle_cmd_.gear_cmd.gear == autoware_msgs::Gear::LOW)
-      {
-        desired_gear = automotive_platform_msgs::Gear::LOW;
-      }
-      else
-      {
-        desired_gear = automotive_platform_msgs::Gear::NONE;
-      }
+      desired_gear = automotive_platform_msgs::Gear::NONE;
     }
   }
+
   // Turn signal
-  unsigned char desired_turn_signal = automotive_platform_msgs::TurnSignalCommand::NONE;
+  uint8_t desired_turn_signal = automotive_platform_msgs::TurnSignalCommand::NONE;
 
   if (vehicle_cmd_.lamp_cmd.l == 0 && vehicle_cmd_.lamp_cmd.r == 0)
   {
@@ -352,4 +312,74 @@ void SSCInterface::timeout(const ros::TimerEvent& event)
   // Disable and publish keepalive commands to prevent SSC from going into fatal
   engage_ = false;
   publishCommand();
+}
+
+uint8_t SSCInterface::convertGear(autoware_msgs::Gear aw_gear)
+{
+  switch (aw_gear.gear)
+  {
+    case autoware_msgs::Gear::NONE:
+    {
+      return automotive_platform_msgs::Gear::NONE;
+    }
+    case autoware_msgs::Gear::PARK:
+    {
+      return automotive_platform_msgs::Gear::PARK;
+    }
+    case autoware_msgs::Gear::REVERSE:
+    {
+      return automotive_platform_msgs::Gear::REVERSE;
+    }
+    case autoware_msgs::Gear::NEUTRAL:
+    {
+      return automotive_platform_msgs::Gear::NEUTRAL;
+    }
+    case autoware_msgs::Gear::DRIVE:
+    {
+      return automotive_platform_msgs::Gear::DRIVE;
+    }
+    case autoware_msgs::Gear::LOW:
+    {
+      return automotive_platform_msgs::Gear::LOW;
+    }
+    default:
+    {
+      return automotive_platform_msgs::Gear::NONE;
+    }
+  }
+}
+
+uint8_t SSCInterface::convertGear(automotive_platform_msgs::Gear am_gear)
+{
+  switch (am_gear.gear)
+  {
+    case automotive_platform_msgs::Gear::NONE:
+    {
+      return autoware_msgs::Gear::NONE;
+    }
+    case automotive_platform_msgs::Gear::PARK:
+    {
+      return autoware_msgs::Gear::PARK;
+    }
+    case automotive_platform_msgs::Gear::REVERSE:
+    {
+      return autoware_msgs::Gear::REVERSE;
+    }
+    case automotive_platform_msgs::Gear::NEUTRAL:
+    {
+      return autoware_msgs::Gear::NEUTRAL;
+    }
+    case automotive_platform_msgs::Gear::DRIVE:
+    {
+      return autoware_msgs::Gear::DRIVE;
+    }
+    case automotive_platform_msgs::Gear::LOW:
+    {
+      return autoware_msgs::Gear::LOW;
+    }
+    default:
+    {
+      return autoware_msgs::Gear::NONE;
+    }
+  }
 }
