@@ -43,6 +43,7 @@
 #include <autoware_msgs/VehicleStatus.h>
 
 static const std::string BASE_FRAME_ID = "base_link";
+const float LOW_SPEED_THRESH = 0.01;
 
 class SSCInterface
 {
@@ -69,6 +70,8 @@ private:
 
   // Functions
   void publishCommand();
+  uint8_t convertGear(autoware_msgs::Gear aw_gear);
+  uint8_t convertGear(automotive_platform_msgs::Gear am_gear);
 
   typedef message_filters::sync_policies::ApproximateTime<
     automotive_platform_msgs::VelocityAccelCov, automotive_platform_msgs::CurvatureFeedback,
@@ -105,16 +108,16 @@ private:
 
   // ros param
   int command_timeout_;        // vehicle_cmd timeout [ms]
-  double wheel_base_;          // [m]
-  double acceleration_limit_;  // [m/s^2]
-  double deceleration_limit_;  // [m/s^2]
-  double max_curvature_rate_;  // [rad/m/s]
+  float wheel_base_;          // [m]
+  float acceleration_limit_;  // [m/s^2]
+  float deceleration_limit_;  // [m/s^2]
+  float max_curvature_rate_;  // [rad/m/s]
 
   bool enable_reverse_motion_;    // flag to change gear for backward driving
   bool use_adaptive_gear_ratio_;  // for more accurate steering angle (gr = theta_sw / theta_s)
-  double tire_radius_;            // [m] (NOTE: used by 'use_rear_wheel_speed' mode)
-  double ssc_gear_ratio_;         // gr = const (NOTE: used by 'use_adaptive_gear_ratio' mode)
-  double agr_coef_a_, agr_coef_b_, agr_coef_c_;  // gr = a + b * speed^2 + c * theta_sw
+  float tire_radius_;            // [m] (NOTE: used by 'use_rear_wheel_speed' mode)
+  float ssc_gear_ratio_;         // gr = const (NOTE: used by 'use_adaptive_gear_ratio' mode)
+  float agr_coef_a_, agr_coef_b_, agr_coef_c_;  // gr = a + b * speed^2 + c * theta_sw
 
   // NOTE: default parameters in SSC
   // tire radius = 0.39             [m]
@@ -127,7 +130,7 @@ private:
   bool engage_ = false;
   bool command_initialized_ = false;
   bool dbw_enabled_ = false;
-  double adaptive_gear_ratio_;
+  float adaptive_gear_ratio_;
   autoware_msgs::VehicleCmd vehicle_cmd_;
 };
 

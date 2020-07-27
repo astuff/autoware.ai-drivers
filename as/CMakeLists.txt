@@ -20,7 +20,6 @@ catkin_package()
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
-  include
 )
 
 add_executable(ssc_interface
